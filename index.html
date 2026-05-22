@@ -1,0 +1,1816 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* ベース設定 */
+        body {
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin-left: 3%;
+            margin-right: 5%;
+            padding: 0;
+            background-color: #fcfcfc;
+        }
+
+        /* 目次エリア（右側フローティング・格納式） */
+        #toc-container {
+            position: fixed;
+            top: 0;
+            right: -260px;
+            /* ★通常は画面外に隠す（幅300pxのうち40pxだけ見せる） */
+            width: 300px;
+            height: 100vh;
+            background-color: #f4f4f4;
+            box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+            transition: right 0.3s ease;
+            /* ★なめらかに動く設定 */
+            z-index: 1000;
+            display: flex;
+            /* タブと中身を横並び */
+        }
+
+        /* カーソルが乗った時に飛び出す設定 */
+        #toc-container:hover {
+            right: 0;
+            /* 画面内に出てくる */
+        }
+
+        /* 目次の「つまみ（タブ）」 */
+        #toc-tab {
+            width: 40px;
+            /* つまみの幅 */
+            background-color: #AE3379;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            writing-mode: vertical-rl;
+            /* 縦書き */
+            font-weight: bold;
+            letter-spacing: 3px;
+            cursor: pointer;
+            user-select: none;
+            border-radius: 5px 0 0 5px;
+        }
+
+        /* 目次リスト本体 */
+        #toc-content-wrapper {
+            width: 260px;
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #toc-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        #toc-list li {
+            margin-bottom: 4px;
+        }
+
+        #toc-list a {
+            text-decoration: none;
+            color: #666;
+            font-size: 0.9em;
+            display: block;
+            padding: 5px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        #toc-list a:hover {
+            background-color: #e0e0e0;
+        }
+
+        /* アクティブな目次 */
+        #toc-list a.active {
+            color: #AE3379;
+            background-color: #dcefff;
+            font-weight: bold;
+            border-left: 3px solid #AE3379;
+        }
+
+        /* メインコンテンツエリア */
+        #main-content {
+            max-width: 800px;
+            margin: 0 auto;
+            /* 中央寄せ */
+            padding: 40px 20px;
+            /* 右側に目次タブ分の余白を少し確保（被り防止） */
+            padding-right: 50px;
+        }
+
+        /* コンテンツ装飾 */
+        h2 {
+            background-color: #AE3379;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-top: 60px;
+            font-size: 1.5em;
+            scroll-margin-top: 20px;
+        }
+
+        .question-block {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            background-color: #fff;
+        }
+
+        h3 {
+            border-left: 5px solid #AE3379;
+            padding-left: 10px;
+            color: #AE3379;
+        }
+
+        .similar-question {
+            background-color: #f9f9f9;
+            border: 1px dashed #bbb;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
+        }
+
+        .options-vertical {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .options-horizontal {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
+            font-weight: bold;
+            background-color: #eee;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .citation {
+            font-size: 0.8em;
+            color: #888;
+            text-align: right;
+        }
+
+        /* スマホ・極小画面対応 */
+        @media (max-width: 600px) {
+            #main-content {
+                padding-right: 20px;
+            }
+
+            /* スマホでも邪魔なら以下で目次を非表示にすることも可能 */
+            /* #toc-container { display: none; } */
+        }
+
+        /* 解説コンテナ全体のスタイル */
+        .explanation-container {
+            margin-top: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+            overflow: hidden;
+        }
+
+        /* クリックする見出し部分 */
+        .explanation-title {
+            padding: 10px 15px;
+            background-color: #eee;
+            cursor: pointer;
+            font-weight: bold;
+            list-style: none;
+            /* デフォルトの三角形を消したい場合 */
+            display: flex;
+            align-items: center;
+        }
+
+        /* 三角アイコンのカスタマイズ（任意） */
+        .explanation-title::before {
+            content: "▶";
+            margin-right: 10px;
+            font-size: 0.8em;
+            transition: transform 0.3s;
+        }
+
+        /* 開いている時のアイコン変化 */
+        .explanation-container[open] .explanation-title::before {
+            transform: rotate(90deg);
+        }
+
+        /* 解説の中身 */
+        .explanation-content {
+            padding: 15px;
+            border-top: 1px solid #ddd;
+            line-height: 1.6;
+            background-color: #ffffff;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 目次コンテナ（ここを追加） -->
+    <nav id="toc-container">
+        <strong>目次</strong>
+        <ul id="toc-list">
+            <!-- JSでここにリストが生成されます -->
+        </ul>
+    </nav>
+
+    <!-- コンテンツ本文 (一部抜粋・これまでの出力内容が入ります) -->
+    <div id="content-main">
+
+        <h2>[総論]</h2>
+        <div class="question-block">
+            【問】左腎静脈は下行大動脈の後面を走行する。（23 問1）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+                        下行大動脈の前面かつ上腸間膜動脈の下をくぐる。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】左精巣静脈は左腎静脈に、右精巣静脈は下大静脈に注ぐ（22 問1）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+                </details>
+            </div>
+            <div class="similar-question">
+                【類題】右副腎静脈は右腎静脈に、左副腎静脈は下大静脈に流入する。（21 問1）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+                        右副腎静脈は下大静脈に、左副腎静脈は左腎静脈に流入する。
+                    </p>
+                </div>
+                </details>
+            </div>
+            <div class="similar-question">
+                【類題】腎動脈は腎静脈の背側に位置する。(19 問1)
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+                </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】前立腺実質に比べ、腎実質は血管床が多い。（23 問2）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                        腎臓は血流の豊富な臓器なので血管床が多い。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】超音波所見において蓄尿時の膀胱よりも前立腺は低エコーに映る。（23 問3）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+                        畜尿時の膀胱は無エコーとなる。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】正常腎の超音波検査では、腎中心部は低エコーを呈する（22 問3）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						腎中心部は多くの組織が集まっており、高エコーとなる。				
+                    </p>
+                </div>
+                </details>
+            </div>
+            <div class="similar-question">
+                【類題】音響陰影は腎嚢胞の特徴的な超音波所見である (19 問3)
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						腎嚢胞では後方エコーが増強する。音響陰影は結石や石灰化の所見である。
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】乳糜尿の原因は細菌感染である。(19 問2)
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：<br>
+						乳糜尿は、フィラリア症によるリンパ管の閉塞・破綻による。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <h2>[尿路結石]</h2>
+        <div class="question-block">
+            【問】尿路結石では、蓚酸カルシウム結石が最も頻度が多い。（23 問5）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】尿酸結石は尿路結石で最も高頻度である（22 問5）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						80~90%はカルシウム結石で、そのうち蓚酸カルシウム結石が最も多い。尿酸結石は5%程度。
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】尿酸結石は単純 X線検査で描出されない。（23 問6）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						X線陰性結石：尿酸結石, キサンチン結石
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】シスチン結石は単純 X 線検査では描出されない（22 問6）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						シスチン結石は描出されるが、純粋な尿酸結石と比較すると、硫黄を含むために不鮮明に描出される(半陰性)。
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+                【類題】尿酸結石は、単純 X 線検査で描出される（21 問5）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+                【類題】尿酸結石はX線陰性である。(19 問6)
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】チョコレートとコーヒーの食べあわせは尿路結石の予防になりうる。（23 問7）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						チョコレート, コーヒーはシュウ酸を多く含むので、シュウ酸カルシウム結石のリスクを高める。<br>
+                        カルシウムは腸管内でシュウ酸と結合し便として排泄されるので、ミルクを混ぜることで予防になる。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】Cushing症候群は尿路結石の原因となる。（23 問8）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						コルチゾール過剰により骨吸収が促進され、高カルシウム尿症をきたすため、尿路結石になりやすい。
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+                【類題】尿路結石において、ビタミン C の摂取(2000mg 以上/1 日)が勧められる（22 問7）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						ビタミンCはシュウ酸に代謝されるため、大量摂取は推奨されない。推奨量は成人で1日100mg, 目安上限は1000~2000mgである。
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+                【類題】原発性アルドステロン症は、尿路結石の原因となる（22 問8）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						原発性アルドステロン症は、代謝性アルカローシスや低カリウム血症により、尿路結石のリスク因子ではあるが、直接の原因にならない。<br>
+                        直接の原因となるのは、高カルシウム血症・尿症を引き起こす原発性副甲状腺機能亢進症である。
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】尿路結石の再発率は約 15％である。（21 問6）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						5年再発率約30~40%, 生涯再発率約50%と非常に高い。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】サンゴ状結石に対しては腎切石術が第一選択となる。(19 問5)
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						第一選択は低侵襲の経皮的腎砕石術であり、経尿道的尿管結石砕石術との併用療法も行われる。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <h2>[尿路感染症]</h2>
+        <div class="question-block">
+            【問】急性単純性膀胱炎では発熱を認めない。（23 問9, 22 問9）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						単純性膀胱炎は局所感染であり、発熱は伴わない。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】急性単純性膀胱炎の起炎菌の多くは大腸菌である（21 問7）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】本邦において、梅毒の感染者数は年々増加している。（23 問10）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】本邦における梅毒の感染者数は年々減少している（22 問10）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】淋菌尿路感染症では、赤色分泌物が見られる。（23 問11）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						淋菌性尿道炎では、黄色～白色の膿性分泌物が多量にみられる。<br>
+                        赤色分泌物は出血性膀胱炎などで見られる。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】淋菌性尿道炎では膿状物質を認める（22 問11）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】非淋菌性尿道炎の原因としてはマイコプラズマ感染が最多である。(19 問7)
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						最も多いのはクラミジア・トラコマティス感染で、マイコプラズマはその次に多い。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】クラミジア性膀胱炎には、マクラロイド系薬とテトラサイクリン系薬が有効である。（23 問12）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						クラミジアは細胞内寄生菌であり、マクロライド系, テトラサイクリン系, ニューキノロン系が第一選択である。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】クラミジア性尿道炎にはマクロライド系抗生物質を用いる（22 問12）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】急性精巣上体炎が発熱を伴うことは稀である（21 問8）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						急性精巣上体炎は、弛張熱(38℃以上の高熱)や陰嚢の疼痛・腫脹を伴う。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】急性腎盂腎炎は女性に好発である。(19 問8)
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						女性は尿道が短いため、膀胱・腎臓へ逆行性感染しやすい。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <h2>[排尿障害]</h2>
+
+        <div class="question-block">
+            【問】夜間頻尿は、排尿症状に分類される。（23 問14）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						畜尿症状：夜間頻尿, 昼間頻尿, 尿意切迫感<br>
+                        排尿症状：尿勢低下, 割線, 排尿遅延
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】残尿感は、排尿障害に分類される（22 問14）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						排尿障害のうち、排尿後症状に分類される。
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+                【類題】無尿と閉尿は腹部 CT で診断する（22 問2）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						より簡便な腹部エコー検査で診断する。
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+                【類題】頻尿は 1 日の排尿回数が 10 回以上と定義される。（21 問2）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						8回以上と定義される。
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】副交感神経の興奮により、膀胱平滑筋が収縮する。（23 問13, 22 問13）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						骨盤神経(副交感神経)の興奮により、膀胱平滑筋の収縮・内尿道括約筋の弛緩が起きて排尿を行う。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】交感神経の興奮により排尿筋が収縮する（21 問9）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						腹下神経(交感神経)は畜尿に働く。
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+                【類題】副交感神経の興奮によって排尿筋は収縮する。(19 問9)
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】総合感冒薬は、過活動膀胱を引き起こす代表的な薬剤である。（23 問15, 22 問15）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						総合感冒薬は抗コリン作用を持ち、副交感神経の働きを低下させるため、尿閉を引き起こす。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】切迫性尿失禁は過活動膀胱の必須症状である。（23 問16, 22 問16）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						必須症状は尿意切迫感である。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】尿意切迫感は過活動膀胱の必須症状である（21 問10）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】過活動膀胱の治療薬として、β3受容体作動薬が用いられる。（23 問17, 22 問17）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】過活動膀胱には β3 受容体阻害薬が有効である（21 問11）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						阻害薬ではなく作動薬。
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】腹圧性尿失禁には、骨盤底筋体操が有効である。（23 問18, 22 問18）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】子宮臓器脱には骨盤底筋体操が有効である（21 問12）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】前立腺肥大症の治療薬であるα1-ブロッカーは前立腺特異抗原（PSA）値を半減させる。（23 問19, 22 問19）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						5α還元酵素阻害薬（フィナステリド、デュタステリド）。α1ブロッカーはPSA値に影響しない。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】前立腺肥大症へは、ホスホジエステラーゼ 5阻害薬(PED5阻害薬)が有効である。（23 問20, 22 問20）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                        前立腺や膀胱下部の平滑筋を弛緩させて血流を改善し、排尿障害症状を緩和するため有効。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】経尿道的前立腺切除術ではレーザーを用いて腫大した前立腺を核出する。(19 問10)
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						TURP：電気メスを用いて前立腺を切除。
+                        HoLEP：レーザーを用いて前立腺を核出。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】自排尿困難症例では尿道カテーテル留置が第1選択である。(19 問11)
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						持続的なカテーテル留置は感染や結石のリスクとなる。第一選択は間欠的自己導尿。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】性器脱に排便障害を伴うのは稀である。(19 問12)
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						直腸脱を伴う場合、高頻度で排便障害を伴う。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <h2>[腎移植・腎不全]</h2>
+        <div class="question-block">
+            【問】友人からの腎提供は自発提供意思が明白であれば可能である。（23 問21, 22 問21）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						原則として親族(血族6親等, 姻族3親等)。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】献腎移植においてクロスマッチ陽性でも腎移植が可能である。（23 問22, 22 問22）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						クロスマッチ陽性=超急性拒絶反応を引き起こす抗体が存在する。禁忌。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】ドナーの腎静脈はレシピエントの内腸骨静脈に端々吻合する。（23 問23, 22 問23, 21 問15）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						外腸骨静脈または総腸骨静脈に端側吻合する。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】ドナー腎の腎静脈はレシピエントの外腸骨静脈に端々吻合する。(19 問15)
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						端々吻合：吻合先の血流を遮断して、断端同士を繋ぐ。<br>
+                        端側吻合：吻合先の血管の側面に穴をあけて繋ぐ。
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】移植腎の拒絶反応により、移植腎血流低下が認められる。(19 問14)
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						拒絶反応により、移植腎内で血管炎や血栓形成が起きるので、移植腎の血流低下や腎腫大が認められる。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】腎移植後はサイトメガロウイルスによる感染が最多である。（23 問24, 22 問24）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						免疫抑制薬による日和見感染症としてみられる。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】腎性貧血の治療法はエリスロポエチン製剤の汎用である。(19 問13)
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】透析導入の原因疾患として最も多いのは糸球体腎炎である（21 問13）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						第一位は糖尿病性腎症(約4割)、続いて腎硬化症、慢性糸球体腎炎。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】日本の生体腎移植の 10 年後の正着率は 90%を超えている（21 問14）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						近年90%に近づいているが、一般的に80~85%と言われている。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <h2>[腎腫瘍]</h2>
+
+        <div class="question-block">
+            【問】腎細胞癌はリンパ行性転移することが知られている。（23 問25）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						血行性転移をしやすいが、リンパ行性転移もする。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】腎腫瘍の大半は悪性腫瘍である（22 問25）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						85~90%が腎細胞癌であり、悪性腫瘍に分類される。
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+                【類題】腎細胞癌の患者の半数は、なんらかの症状を有している（21 問16）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						偶発癌が全体の7割以上を占め、半数以上が無症状である。<br>
+                        まれだが、症状がある場合は、血尿・疼痛・腹部腫瘤が見られる。
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+                【類題】腎細胞癌の超音波所見では偽被膜を反映し腫瘍周囲が高エコー帯を呈する。（21 問3）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						偽被膜は低エコー帯として観察される。
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】腎細胞癌の約半数は淡明細胞型である。（23 問26, 22 問26）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						淡明細胞癌は全体の80~85%である。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】腎細胞癌の組織型の約60%は淡明細胞癌である。(19 問16)
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】腎細胞癌の転移先は肺が最多である。(19 問17)
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						肺転移が最多で、他には骨転移, 肝転移, 脳転移などが多くみられる。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】転移性腎細胞癌に対しては放射線治療と化学療法の併用が有用である。（23 問27）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						腎細胞癌は放射線治療・化学療法どちらにも抵抗性である。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】転移性腎細胞癌の治療には、シスプラチンを中心とした多剤併用療法が有用である（22 問27）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+                【類題】転移性腎細胞癌には、免疫チェックポイント阻害剤が効果が高い（21 問17, 19 問18）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						分子標的薬, 免疫チェックポイント阻害剤は、進行性・転移性腎細胞癌に有効である。
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】ロボット支援下腎部分切除術は、ロボット補助下腎摘除術に比べて低侵襲ではあるがその治療成績は劣る。（23 問28, 22 問28）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						早期の腎腫瘍に対する部分切除術は低侵襲で、治療成績は全摘術と同等である。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】腎臓の部分切除は、腎動脈阻血下で行われることが多い（21 問18）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <h2>[尿路上皮癌]</h2>
+
+        <div class="question-block">
+            【問】腎盂・尿管癌は女性の方が頻度が高い。（23 問29, 22 問29）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						男性に好発し、男女比3:1。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】腎盂･尿管癌の診断に CT Urographyは有用である。（23 問30, 22 問30）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】腎盂尿管癌の診断には MRI が有用である（21 問20, 19 問4）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						MRIは、標準的な検査ではなく、造影剤アレルギーなどの場合に用いられる。
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+                【類題】腎盂尿管癌の多くは尿細胞診で診断可能。(19 問20)
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						低異型度のがんでは、組織がしっかりしているので、尿細胞診の陽性率が低い。
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】限局性腎盂尿管癌に対して腎尿管全摘除術は標準治療である。（23 問31, 21 問19）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						腎盂・尿管癌は多中心性発生・再発を起こしやすいため、全摘が標準である。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】腎盂・尿管癌の治療には化学放射線併用療法が用いられる（22 問31）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+                【類題】早期腎盂・尿管癌の標準治療には内視鏡を用いた腫瘍切除をする。(19 問19)
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						全摘術に内視鏡は用いない。<br>
+                        内視鏡的切除は、孤立腎, 両側性, 腎機能極度低下症例など、腎温存が必要な例にのみ適応される。
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】無症状性肉眼的血尿は膀胱癌の代表的な症状である。（23 問32, 22 問32, 21 問22, 19 問22）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】膀胱上皮内癌（CIS）は、尿細胞診の陽性率が低い。（23 問33）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						膀胱上皮内癌は高異型度が多く、剥がれ落ちた細胞が尿細胞診で発見されやすい。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】膀胱上皮内癌において BCG 維持注入療法が有効である（22 問33）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                        膀胱上皮内癌には、BCG(結核生ワクチン)の注入が特異的に有効である。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】膀胱上皮内癌に対しては抗癌剤膀胱注入療法が有効である（21 問23, 19 問23）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】筋層浸潤性膀胱癌に対する標準治療は、経尿道的膀胱腫瘍切除術である。（23 問34）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						筋層まで浸潤している場合、膀胱全摘除術が標準治療となる。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】筋層浸潤性膀胱癌の標準治療は膀胱全摘除術である（22 問34, 21 問24）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】膀胱全摘術における尿路変更術としては、結腸導管造設術が最多である。(19 問24)
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						最も多く行われているのは、回腸導管造設術である。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】膀胱癌の組織型は扁平上皮癌が最多である（21 問21）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						尿路上皮癌が最多である。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】肥満は膀胱癌の危険因子である。(19 問21)
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						喫煙および職業性化学物質への曝露が危険因子とされる。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <h2>[前立腺癌]</h2>
+
+        <div class="question-block">
+            【問】前立腺癌の画像診断には MRIの T2画像が有用である。（23 問4, 22 問4）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                        T1強調画像：解剖学的構造を見るのに適する。<br>
+                        T2強調画像：病変部(水分の多い部分)を見るのに適する。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】前立腺癌の診断に関して、MRI 検査での T1 強調像が重要である。（21 問4）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】前立腺癌は辺縁領域から発生する。（23 問35）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】前立腺癌は移行領域から発生することが多い（22 問36）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						移行領域からは前立腺肥大症が発生しやすい。
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】前立腺癌転移に対して放射線治療は行わない。（23 問36）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						前立腺癌には放射線治療が有効である。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】前立腺癌では ALK遺伝子の変異が多く認められる。（23 問37）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						ALK：肺癌など<br>
+                        前立腺癌では、BRCA1/2, TP53, ARなどの変異が関連する。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】前立腺癌では VHL 遺伝子の変異が多く認められる（22 問37）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						VHL：腎細胞癌
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】ロボット支援下の前立腺部分切除も行われる。（23 問39）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						前立腺癌は全摘除術が原則である。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】ロボット支援下前立腺全摘手術の術後合併症として、尿失禁がある（22 問39）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						述語合併症として、尿道括約筋のダメージによる腹圧性尿失禁や勃起障害が挙げられる。
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+                【類題】本邦の前立腺全摘術の約半分がロボット支援手術である。(19 問26)
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						保険適用であるため、8~9割がロボット支援手術である。
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】前立腺全摘除術に際しては精嚢も一塊に除去する。（21 問26）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						前立腺癌は精嚢に浸潤しやすいため、全摘除術では、前立腺, 精嚢, 両側の精管を摘除する。
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】転移性前立腺癌は骨転移しやすい。（23 問40）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】転移性前立腺癌に対しては免疫チェックポイント阻害薬が有効である（22 問40）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						前立腺癌の多くは遺伝子変異量が少ないため、免疫チェックポイント阻害薬は効果が限定的である。<br>
+                        治療はホルモン療法(アンドロゲン遮断)が主軸となる。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+            【問】前立腺癌の治療においてはホルモン療法が有効であり根治が期待できる。（21 問27）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						治療として有効ではあるが、数年で去勢抵抗性前立腺癌に移行し、根治が困難である。<br>
+                        根治的治療では、手術や放射線療法がおこなわれる。
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+                【類題】前立腺癌に対してシスプラチンが有効である（21 問28）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						シスプラチンは用いられず、ドセタキセルやカバジタキセルが用いられる。
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+                【類題】去勢抵抗性前立腺癌の治療はシスプラチンが有効である。(19 問27)
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+            【問】限局性前立腺癌にはホルモン療法が有効な治療の一つである。（23 問38）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						転移の無い場合、根治を目指さないならホルモン療法が有効である。
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+                【類題】限局性前立腺癌の治療としては、強度変調放射線治療を利用する（22 問38）
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						IMRTは周囲の直腸や膀胱への障害を抑えつつ前立腺に高線量を集中して照射できる。
+                    </p>
+                </div>
+            </details>
+            </div>
+            <div class="similar-question">
+                【問】小線源療法は進行性局所前立腺癌に適応。(19 問28)
+                <details class="explanation-container">
+                    <summary class="explanation-title">解説</summary>
+                    <div class="explanation-content">
+                        <p>
+                            <!--ここに解説の本文を記述-->
+                            解答：x<br>
+                            小線源療法は、低リスク〜中リスクの限局性前立腺癌に適応される。<br>
+                            進行性局所癌の場合には、IMRTなどが選択される。
+                        </p>
+                    </div>
+                </details>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】本邦における部位別癌の罹患率(男性)で第１位は、前立腺癌である（22 問35）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <div class="question-block">
+            【問】PSA が高値の場合は前立腺癌の診断に前立腺生検は不要である。（21 問25, 19 問25）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						前立腺肥大症や炎症でもPSAは高値となる。確定診断のためには前立腺生検が必要である。<br>
+                    </p>
+                </div>
+            </details>
+        </div>
+
+        <h2>[その他の腫瘍]</h2>
+        <div class="question-block">
+            【問】陰茎がんの転移先として骨盤内リンパ節が最多である（21 問29）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：x<br>
+						第一次リンパ節が鼠経リンパ節、第二次リンパ節が骨盤内リンパ節である。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】陰茎癌の手術に際しては骨盤内リンパ節郭清術が併用される。(19 問29)
+                <details class="explanation-container">
+                    <summary class="explanation-title">解説</summary>
+                    <div class="explanation-content">
+                        <p>
+                            <!--ここに解説の本文を記述-->
+                            解答：x<br>
+                            鼠経リンパ節に多数の転移がある場合は、骨盤内リンパ節郭清の追加が検討される。
+                        </p>
+                    </div>
+                </details>
+            </div>
+        </div>
+
+
+
+        <div class="question-block">
+            【問】精巣腫瘍では転移の有無を問わず、高位精巣摘除術が行われる（21 問30）
+            <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+						原発巣の確定診断および腫瘍マーカー低減のために、原則全例で行われる。
+                    </p>
+                </div>
+            </details>
+            <div class="similar-question">
+                【類題】セミノーマは放射線療法に対する感受性が高い。(19 問30)
+                <details class="explanation-container">
+                <summary class="explanation-title">解説</summary>
+                <div class="explanation-content">
+                    <p>
+                        <!--ここに解説の本文を記述-->
+                        解答：o<br>
+                    </p>
+                </div>
+            </details>
+            </div>
+        </div>
+
+        <h2>[記述問題]</h2>
+        <div class="question-block">
+            【問】代表的な泌尿器科疾患一つについて、症状、診断、治療法について簡潔に記述せよ
+        </div>
+
+        <div class="question-block">
+            【問】泌尿器科についての印象を述べよ
+        </div>
+
+        <script>
+            const tocList = document.getElementById("toc-list");
+            const headings = document.querySelectorAll("h2");
+            const tocLinks = [];
+
+            // 目次生成
+            headings.forEach((h2, i) => {
+                const id = "section-" + (i + 1);
+                h2.id = id;
+                const li = document.createElement("li");
+                const a = document.createElement("a");
+                a.href = "#" + id;
+                a.textContent = h2.textContent.replace("[", "").replace("]", "");
+                a.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+                });
+                li.appendChild(a);
+                tocList.appendChild(li);
+                tocLinks.push(a);
+            });
+
+            // ハイライト監視
+            const observer = new IntersectionObserver(
+                entries => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            tocLinks.forEach(link => link.classList.remove("active"));
+                            const index = [...headings].indexOf(entry.target);
+                            if (tocLinks[index]) {
+                                tocLinks[index].classList.add("active");
+                                // アクティブな項目が見えるように目次内スクロール
+                                tocLinks[index].scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                            }
+                        }
+                    });
+                },
+                { rootMargin: "-40% 0px -55% 0px", threshold: 0 }
+            );
+            headings.forEach(h2 => observer.observe(h2));
+        </script>
+
+</body>
+
+</html>
